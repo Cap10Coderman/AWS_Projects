@@ -1,3 +1,3 @@
 # AWS_Projects
 
-## This project contains AWS Projects
+## This project contains AWS Projects.
