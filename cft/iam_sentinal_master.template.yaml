@@ -1,0 +1,137 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Demo: This template will creates and configure cloudtrail.
+
+Parameters:
+
+  SNSTopicSubscriptionSubsciber1:
+    Type: String
+    Default: unny.learning@gmail.com # Change this to your email
+
+Resources:
+
+  # SNS Topic for Alerts
+
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: SecurityAnomalyAlerts
+      DisplayName: Security Alerts for IAM Policy Changes
+      Tags:
+          - Key: user
+            Value: unny
+
+  SNSTopicSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref SNSTopic
+      Protocol: email
+      Endpoint: !Ref SNSTopicSubscriptionSubsciber1
+
+  CloudTrailLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: cloudtrail/security-demo
+      RetentionInDays: 14
+      Tags:
+          - Key: user
+            Value: unny
+
+  CloudTrailRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CloudTrailToCWLogsRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CloudTrailCWLogsPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: !GetAtt CloudTrailLogGroup.Arn
+
+#CloudTrail
+
+  SecurityTrail:
+    DependsOn: CloudTrailS3BucketPolicy
+    Type: AWS::CloudTrail::Trail
+    Properties:
+      TrailName: SecurityDemoTrail
+      IsLogging: true
+      IncludeGlobalServiceEvents: true
+      IsMultiRegionTrail: true
+      EnableLogFileValidation: true
+      CloudWatchLogsLogGroupArn: !GetAtt CloudTrailLogGroup.Arn
+      CloudWatchLogsRoleArn: !GetAtt CloudTrailRole.Arn
+      S3BucketName: !Ref CloudTrailS3Bucket
+      Tags:
+          - Key: user
+            Value: unny
+
+  # # S3 Bucket for CloudTrail Logs
+
+  CloudTrailS3Bucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireOldLogs
+            Status: Enabled
+            ExpirationInDays: 30
+      Tags:
+          - Key: user
+            Value: unny
+
+# S3 Bucket Policy for CloudTrail Logs
+
+  CloudTrailS3BucketPolicy:
+    Type: 'AWS::S3::BucketPolicy'
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17 		 	 	 
+        Statement:
+
+          - Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:GetBucketAcl
+            Resource: !Sub arn:aws:s3:::${CloudTrailS3Bucket}
+
+          - Effect: Allow
+            Principal:
+              Service: cloudtrail.amazonaws.com
+            Action: s3:PutObject
+            Resource: !Sub arn:aws:s3:::${CloudTrailS3Bucket}/AWSLogs/${AWS::AccountId}/*
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: bucket-owner-full-control
+      Bucket: !Ref CloudTrailS3Bucket
+
+
+Outputs:
+
+  SNSTopicArn:
+    Description: ARN of the SNS topic for security alerts
+    Value: !Ref SNSTopic
+    Export:
+      Name: !Sub "${AWS::StackName}-SNSTopicArn"
+
+  CloudTrailLogGroupName:
+    Description: CloudTrail LogGroup Name
+    Value: !Ref CloudTrailLogGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-CloudTrailLogGroupName"
