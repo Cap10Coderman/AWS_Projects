@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  This template is for Module1
+  Demo1: CloudWatch alarms with EventBridge rules to automatically route alerts to SNS.
+  This will show a pipeline that sends an alert for IAM policy changes to security teams via email.
+
+Parameters:
+  MasterStackName:
+    Description: The MasterStack Name
+    Type: String
+    Default: Module1-Demo1-Master
+
+Resources:
+
+  AmazonEventBridgeInvokeSnsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EventBridgeToSNSPublishRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AllowPublishToSNS
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sns:Publish
+                Resource: 
+                  - !ImportValue
+                    Fn::Sub: ${MasterStackName}-SNSTopicArn
+
+  IAMpolicyChangeEventbridgeRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: IampolicyChange
+      EventPattern: >-
+        {
+        "source":["aws.iam"],"detail-type":["AWS API Call via CloudTrail"],
+        "detail":{"eventSource":["iam.amazonaws.com"],
+        "eventName":[
+          "CreatePolicy",
+          "CreatePolicyVersion",
+          "PutUserPolicy",
+          "AttachUserPolicy",
+          "AttachGroupPolicy",
+          "AttachRolePolicy",
+          "DeletePolicy",
+          "DeletePolicyVersion",
+          "DetachUserPolicy",
+          "DetachRolePolicy"
+          ]}}
+      State: ENABLED
+      Description: This rule will send alert to SNS if there is any policy changes to IAM User.
+      EventBusName: default
+      Targets:
+        - Id: Id01
+          Arn : 
+            !ImportValue
+              Fn::Sub: ${MasterStackName}-SNSTopicArn
+          RoleArn: !GetAtt AmazonEventBridgeInvokeSnsRole.Arn
+      Tags:
+          - Key: user
+            Value: unny
