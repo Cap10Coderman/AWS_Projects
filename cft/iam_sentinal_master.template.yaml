@@ -1,10 +1,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: >
-  Demo: This template will creates and configure cloudtrail.
+Description: This is the master template to create services for IAM Sentinal Project.
 
 Parameters:
 
-  SNSTopicSubscriptionSubsciber1:
+  SNSTopicSubscriptionSubsciber:
     Type: String
     Default: unny.learning@gmail.com # Change this to your email
 
@@ -26,13 +25,13 @@ Resources:
     Properties:
       TopicArn: !Ref SNSTopic
       Protocol: email
-      Endpoint: !Ref SNSTopicSubscriptionSubsciber1
+      Endpoint: !Ref SNSTopicSubscriptionSubsciber
 
   CloudTrailLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: cloudtrail/security-demo
-      RetentionInDays: 14
+      RetentionInDays: 7
       Tags:
           - Key: user
             Value: unny
@@ -77,7 +76,7 @@ Resources:
           - Key: user
             Value: unny
 
-  # # S3 Bucket for CloudTrail Logs
+  # S3 Bucket for CloudTrail Logs
 
   CloudTrailS3Bucket:
     Type: 'AWS::S3::Bucket'
@@ -91,7 +90,7 @@ Resources:
         Rules:
           - Id: ExpireOldLogs
             Status: Enabled
-            ExpirationInDays: 30
+            ExpirationInDays: 10
       Tags:
           - Key: user
             Value: unny
@@ -120,7 +119,6 @@ Resources:
               StringEquals:
                 s3:x-amz-acl: bucket-owner-full-control
       Bucket: !Ref CloudTrailS3Bucket
-
 
 Outputs:
 
